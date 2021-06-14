@@ -65,7 +65,7 @@ def generate_blocks(im_shape: tuple, rand_type: str, rng, **kwargs) -> list:
     return blocks
 
 
-def extract_prnu_var(imgs: list, r: int, t_low: float, t_up: float, rand_type: str = None, **kwargs) -> np.ndarray:
+def extract_prnu_var(imgs: list, r: int, t_low: float, t_up: float, levels: int = 4, rand_type: str = None, **kwargs) -> np.ndarray:
     """
     Extract prnu noise from a list of images of same size, using one of the variance-based methods.
 
@@ -73,6 +73,7 @@ def extract_prnu_var(imgs: list, r: int, t_low: float, t_up: float, rand_type: s
     :param r: number of block to use for noise extraction
     :param t_low: lowest mean luminance value for which a block is accepted
     :param t_up: highest mean luminance value for which a block is accepted
+    :param levels: number of wavelet decomposition levels
     :param rand_type: specify the variance-based attack type: None for <Var>, "A" for <randVar-A>, or "B" for <randVar-B>
 
     kwargs
@@ -111,5 +112,5 @@ def extract_prnu_var(imgs: list, r: int, t_low: float, t_up: float, rand_type: s
         else:
             var = np.array(var[:r], copy=False, dtype=object)
 
-        K[b] = prnu.extract_multiple_aligned(var.T[1], levels=1)
+        K[b] = prnu.extract_multiple_aligned(var.T[1], levels=levels)
     return K
