@@ -3,11 +3,33 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from glob import glob
 
-import prnu
-from extract import extract_prnu_var
+from functions import generate_blocks
+from functions import extract_prnu_var
 
-import warnings
-warnings.filterwarnings('ignore', category=UserWarning)
+
+def var(imgs):
+    print("generate blocks")
+    blocks = generate_blocks(imgs[0].shape, randomize=False)
+
+    print("extracting prnu")
+    return extract_prnu_var(imgs, blocks, r=7, lum_range=(5, 250), levels=1)
+
+
+def rand_var_a(imgs):
+    print("generate blocks")
+    blocks = generate_blocks(imgs[0].shape, randomize=False)
+
+    print("extracting prnu")
+    return extract_prnu_var(imgs, blocks, r=7, R=10, lum_range=(5, 250), levels=1)
+
+
+def rand_var_b(imgs):
+    print("generate blocks")
+    blocks = generate_blocks(imgs[0].shape, randomize=True)
+
+    print("extracting prnu")
+    return extract_prnu_var(imgs, blocks, r=7, R=10, lum_range=(5, 250), levels=1)
+
 
 print("loading images")
 dirlist = np.array(sorted(glob("data/*.jpg")))
@@ -16,12 +38,10 @@ for im_path in dirlist:
     im = Image.open(im_path)
     imgs.append(np.array(im, copy=False))
 
-print("extracting prnu")
-W = extract_prnu_var(imgs, levels=3, r=7, R=14,
-                     t_low=10, t_up=245, rand_type="B")
+K = var(imgs)
 
 print("show prnu")
-print("\tdtype:", W.dtype)
-print("\tmin max:", "%.2f" % W.min(), "%.2f" % W.max())
-plt.imshow(W, cmap="Greys")
+print("\tdtype:", K.dtype)
+print("\tmin max:", "%.2f" % K.min(), "%.2f" % K.max())
+plt.imshow(K, cmap="Greys")
 plt.show()
