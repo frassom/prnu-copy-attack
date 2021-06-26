@@ -12,7 +12,7 @@ def var(imgs):
     blocks = generate_blocks(imgs[0].shape, randomize=False)
 
     print("extracting prnu")
-    return extract_prnu_var(imgs, blocks, r=7, lum_range=(5, 250), levels=1)
+    return extract_prnu_var(imgs, blocks, lum_range=(5, 250),  r=7, levels=1)
 
 
 def rand_var_a(imgs):
@@ -20,7 +20,7 @@ def rand_var_a(imgs):
     blocks = generate_blocks(imgs[0].shape, randomize=False)
 
     print("extracting prnu")
-    return extract_prnu_var(imgs, blocks, r=7, R=10, lum_range=(5, 250), levels=1)
+    return extract_prnu_var(imgs, blocks, lum_range=(5, 250), r=7, R=10, levels=1)
 
 
 def rand_var_b(imgs):
@@ -28,7 +28,7 @@ def rand_var_b(imgs):
     blocks = generate_blocks(imgs[0].shape, randomize=True)
 
     print("extracting prnu")
-    return extract_prnu_var(imgs, blocks, r=7, R=10, lum_range=(5, 250), levels=1)
+    return extract_prnu_var(imgs, blocks, lum_range=(5, 250), r=7, R=10, levels=1)
 
 
 print("loading images")

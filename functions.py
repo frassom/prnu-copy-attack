@@ -73,15 +73,15 @@ def generate_blocks(im_shape: tuple, randomize: bool, rng: np.random.Generator =
     return blocks
 
 
-def extract_prnu_var(imgs: list, blocks: list, r: int, lum_range: tuple,
+def extract_prnu_var(imgs: list, blocks: list, lum_range: tuple, r: int,
                      R: int = None, rng: np.random.Generator = None, **kwargs) -> np.ndarray:
     """
     Extract prnu noise from a list of images of same size, using one of the variance-based methods
 
     :param imgs: list of np.ndarray of shape (h, w, ch) and type np.uint8 used to extract prnu
     :param blocks: list of (slice, slice) in which images are subdivided for prnu extraction
-    :param r: number of block to use for noise extraction
     :param lum_range: (t_low, t_up) range of luminance value for which a block is accepted
+    :param r: number of block to use for noise extraction
     :param R: number of lowest variance blocks to retain in <ranVar-*> attacks for randomized selection of r blocks later
     :param rng: the numpy random generator to use in <randVar-*> attacks
     :param kwargs: additional parameter to pass to extract_multiple_aligned() in prnu-python
