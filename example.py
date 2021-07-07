@@ -3,13 +3,12 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from glob import glob
 
-from functions import generate_blocks
-from functions import extract_prnu_var
+from functions import *
 
 
 def var(imgs):
     print("generate blocks")
-    blocks = generate_blocks(imgs[0].shape, randomize=False)
+    blocks = gen_blocks(imgs[0].shape)
 
     print("extracting prnu")
     return extract_prnu_var(imgs, blocks, lum_range=(5, 250),  r=7, levels=1)
@@ -17,7 +16,7 @@ def var(imgs):
 
 def rand_var_a(imgs):
     print("generate blocks")
-    blocks = generate_blocks(imgs[0].shape, randomize=False)
+    blocks = gen_blocks(imgs[0].shape)
 
     print("extracting prnu")
     return extract_prnu_var(imgs, blocks, lum_range=(5, 250), r=7, R=10, levels=1)
@@ -25,7 +24,7 @@ def rand_var_a(imgs):
 
 def rand_var_b(imgs):
     print("generate blocks")
-    blocks = generate_blocks(imgs[0].shape, randomize=True)
+    blocks = gen_blocks_rnd(imgs[0].shape)
 
     print("extracting prnu")
     return extract_prnu_var(imgs, blocks, lum_range=(5, 250), r=7, R=10, levels=1)
