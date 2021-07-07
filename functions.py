@@ -97,7 +97,7 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
     ----------
     imgs : list of numpy.ndarray
         images of shape (h, w, ch) and type np.uint8 used to extract prnu
-    blocks : list of (slice, slice) 
+    blocks : list of (slice, slice)
         division in block of images for prnu extraction, see gen_block[_rnd](...)
     lum_range : tuple of int
         (t_low, t_up) range of luminance value for which a block is accepted
@@ -132,10 +132,12 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
                 var.append([np.var(im_gray[b]), im[b]])
 
         var.sort(key=lambda a: a[0])
-        if not R:
-            var = np.array(var[:r], copy=False, dtype=object)
+
+        if R is None:
+            var = np.asanyarray(var[:r], dtype=object)
         else:
-            var = rng.choice(var[:R], r, replace=False)
+            var = np.asanyarray(var[:R], dtype=object)
+            var = rng.choice(var, r, replace=False)
 
         K[b] = prnu.extract_multiple_aligned(var.T[1], **kwargs)
 
