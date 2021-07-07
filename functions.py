@@ -32,7 +32,7 @@ def gen_blocks(im_shape, block_shape=(16, 16)):
 
     Returns
     -------
-    list of (slice,slice)
+    blocks : list of (slice,slice)
     """
     assert(im_shape[0] % block_shape[0] == 0)
     assert(im_shape[1] % block_shape[1] == 0)
@@ -112,7 +112,8 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
 
     Returns
     -------
-    prnu : numpy.ndarray
+    K : numpy.ndarray
+        prnu noise
     """
 
     if not rng:
