@@ -3,10 +3,10 @@ from tqdm import tqdm
 
 import prnu
 
-__rng = np.random.default_rng(42)
+_rng = np.random.default_rng(42)
 
 
-def __random_int(rng: np.random.Generator, min_val: int, max_val: int, available: int) -> int:
+def _random_int(rng: np.random.Generator, min_val: int, max_val: int, available: int) -> int:
     """
     Generate a random number between min_val and max_val given the available space, taking care of
     leaving enough space for the next iteration.
@@ -34,6 +34,7 @@ def gen_blocks(im_shape, block_shape=(16, 16)):
     -------
     blocks : list of (slice,slice)
     """
+
     assert(im_shape[0] % block_shape[0] == 0)
     assert(im_shape[1] % block_shape[1] == 0)
 
@@ -67,19 +68,19 @@ def gen_blocks_rnd(im_shape, min_block_shape=(16, 16), max_block_shape=(30, 30),
     blocks : list of (slice, slice)
     """
 
-    if not rng:
-        rng = __rng
+    if rng is None:
+        rng = _rng
 
     blocks = list()
 
     i0 = 0
     while i0 < im_shape[0]:
-        height = __random_int(
+        height = _random_int(
             rng, min_block_shape[0], max_block_shape[0], im_shape[0] - i0)
 
         i1 = 0
         while i1 < im_shape[1]:
-            width = __random_int(
+            width = _random_int(
                 rng, min_block_shape[1], max_block_shape[1], im_shape[1] - i1)
 
             blocks.append(np.s_[i0:i0+height, i1:i1+width])
@@ -116,8 +117,8 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
         prnu noise
     """
 
-    if not rng:
-        rng = __rng
+    if rng is None:
+        rng = _rng
 
     K = np.empty(imgs[0].shape[0:2])
 
