@@ -532,10 +532,10 @@ def stats(cc: np.ndarray, gt: np.ndarray, ) -> dict:
     :return: statistics dictionary
     """
     assert (cc.shape == gt.shape)
-    assert (gt.dtype == np.bool)
+    assert (gt.dtype == bool)
 
     assert (cc.shape == gt.shape)
-    assert (gt.dtype == np.bool)
+    assert (gt.dtype == bool)
 
     fpr, tpr, th = roc_curve(gt.flatten(), cc.flatten())
     auc_score = auc(fpr, tpr)
@@ -568,7 +568,7 @@ def gt(l1: list or np.ndarray, l2: list or np.ndarray) -> np.ndarray:
     assert (l1.ndim == 1)
     assert (l2.ndim == 1)
 
-    gt_arr = np.zeros((len(l1), len(l2)), np.bool)
+    gt_arr = np.zeros((len(l1), len(l2)), dtype=bool)
 
     for l1idx, l1sample in enumerate(l1):
         gt_arr[l1idx, l2 == l1sample] = True
