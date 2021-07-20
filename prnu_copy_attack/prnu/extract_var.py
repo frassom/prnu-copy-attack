@@ -3,6 +3,7 @@ from tqdm import tqdm
 
 from .extract import extract_multiple_aligned, rgb2gray
 
+
 _rng = np.random.default_rng(42)
 
 
