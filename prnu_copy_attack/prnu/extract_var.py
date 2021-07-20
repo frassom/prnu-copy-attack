@@ -1,16 +1,31 @@
 import numpy as np
 from tqdm import tqdm
 
-import prnu
+from .extract import extract_multiple_aligned, rgb2gray
 
 _rng = np.random.default_rng(42)
 
 
-def _random_int(rng: np.random.Generator, min_val: int, max_val: int, available: int) -> int:
+def _random_int(rng, min_val, max_val, available):
     """
-    Generate a random number between min_val and max_val given the available space, taking care of
-    leaving enough space for the next iteration.
+    Generate a random number between min_val and max_val given the available space,
+    taking care of leaving enough space for the next iteration.
+
+    Parameters
+    ----------
+    rng : numpy.random.Generator
+    min_val, max_val : int
+        range of the value
+    available : int
+        value used to cumpute how much "space" is left, if there is not enough space
+        this value is returned.
+
+    Returns
+    -------
+    int
+        random integer
     """
+
     if available - min_val >= max_val:
         return rng.integers(min_val, max_val + 1)
     elif available - min_val >= min_val:
@@ -47,10 +62,10 @@ def gen_blocks(im_shape, block_shape=(16, 16)):
     return blocks
 
 
-def gen_blocks_rnd(im_shape, min_block_shape=(16, 16), max_block_shape=(30, 30), rng=None):
+def gen_blocks_rnd(im_shape, min_block_shape=(16, 16), max_block_shape=(40, 40), rng=None):
     """
     Generate a list of pair of slices representing the blocks the images are divided into,
-    each block size is randomized
+    as in gen_blocks, each row has randomized height and each block has randomized width.
 
     Parameters
     ----------
@@ -90,7 +105,7 @@ def gen_blocks_rnd(im_shape, min_block_shape=(16, 16), max_block_shape=(30, 30),
     return blocks
 
 
-def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
+def extract_prnu_var(imgs, blocks, r, lum_range=(30, 220), R=None, rng=None, **kwargs):
     """
     Extract prnu noise from a list of images of same size, using one of the variance-based methods
 
@@ -99,17 +114,17 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
     imgs : list of numpy.ndarray
         images of shape (h, w, ch) and type np.uint8 used to extract prnu
     blocks : list of (slice, slice)
-        division in block of images for prnu extraction, see gen_block[_rnd](...)
-    lum_range : tuple of int
-        (t_low, t_up) range of luminance value for which a block is accepted
+        division in block of images for prnu extraction, see gen_block[_rnd]
     r : int
         number of block to use for noise extraction
+    lum_range : tuple of int, optional
+        (t_low, t_up) range of luminance value for which a block is accepted
     R : int, optional
         number of lowest variance blocks to retain in ranVar attacks for randomized selection of r blocks
     rng : numpy.random.Generator, optional
         the numpy random generator to use, if None the default is used
     **kwargs : dict, optional
-        additional parameters to pass to extract_multiple_aligned() in prnu-python
+        additional parameters to pass to extract_multiple_aligned in extract.py
 
     Returns
     -------
@@ -126,7 +141,7 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
     for b in tqdm(blocks):
         var = list()
         for im in imgs:
-            im_gray = prnu.rgb2gray(im)
+            im_gray = rgb2gray(im)
 
             mean = np.mean(im_gray[b])
             if lum_range[0] <= mean <= lum_range[1]:
@@ -140,6 +155,6 @@ def extract_prnu_var(imgs, blocks, lum_range, r, R=None, rng=None, **kwargs):
             var = np.asanyarray(var[:R], dtype=object)
             var = rng.choice(var, r, replace=False)
 
-        K[b] = prnu.extract_multiple_aligned(var.T[1], **kwargs)
+        K[b] = extract_multiple_aligned(var.T[1], **kwargs)
 
     return K
