@@ -1,3 +1,9 @@
+# Copyright (c) 2021 Marco Frassineti
+#
+# Licensed under the MIT license: https://opensource.org/licenses/MIT
+# Permission is granted to use, copy, modify, and redistribute the work.
+# Full license information available in the project LICENSE file.
+
 from .extract_var import gen_blocks
 from .extract_var import gen_blocks_rnd
 from .extract_var import extract_prnu_var
