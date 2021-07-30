@@ -120,10 +120,11 @@ def _random_int(rng, min_val, max_val, available):
 
     if available - min_val >= max_val:
         return rng.integers(min_val, max_val + 1)
-    elif available - min_val >= min_val:
+
+    if available - min_val >= min_val:
         return rng.integers(min_val, available - min_val + 1)
-    else:
-        return available
+
+    return available
 
 
 def gen_blocks(im_shape, block_shape=(16, 16)):
@@ -142,8 +143,13 @@ def gen_blocks(im_shape, block_shape=(16, 16)):
     blocks : list of (slice,slice)
     """
 
-    assert(im_shape[0] % block_shape[0] == 0)
-    assert(im_shape[1] % block_shape[1] == 0)
+    if im_shape[0] % block_shape[0] != 0:
+        raise ValueError(
+            f"cannot fit block size {block_shape[0]} on image size {im_shape[0]}, axis=0")
+
+    if im_shape[1] % block_shape[1] != 0:
+        raise ValueError(
+            f"cannot fit block size {block_shape[1]} on image size {im_shape[1]}, axis=1")
 
     blocks = list()
 
