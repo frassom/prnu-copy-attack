@@ -6,7 +6,7 @@
 # Full license information available in the project LICENSE file.
 
 import numpy as np
-import scipy as sp
+import scipy.signal as signal
 
 
 def crosscorr(x, y):
@@ -29,7 +29,7 @@ def crosscorr(x, y):
         raise ValueError("input ndarray must have the same shape")
 
     norm = np.linalg.norm(x) * np.linalg.norm(y)
-    return sp.signal.correlate2d(x, y, mode="valid")[0, 0] / norm
+    return signal.correlate2d(x, y, mode="valid")[0, 0] / norm
 
 
 def crosscorr2d(x, y) -> np.ndarray:
