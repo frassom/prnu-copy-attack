@@ -12,7 +12,7 @@ import stats
 
 def copy_attack(im, k, alpha=None):
     """
-    Perform a fingerprint-copy attack on im with fingerprint k
+    Perform a fingerprint-copy attack on im with fingerprint k.
 
     Parameters
     ----------
@@ -41,6 +41,30 @@ def copy_attack(im, k, alpha=None):
 
 
 def compute_alpha(im, k, A=50):
+    """
+    Return the value of fingerprint strength that if used on an image
+    J to generate J' with copy_attack result in PSNR(J,J') == A.
+
+    As described in:
+    H. Li, W. Luo, Q. Rao, J. Huang 
+        "Anti-Forensics of Camera Identification and the
+         Triangle Test by Improved Fingerprint-Copy Attack."
+
+    Parameters
+    ----------
+    im : numpy.ndarray
+        Image to be forged with k.
+    k : numpy.ndarray
+        Camera fingerprint.
+    A : float, optional
+        Target value of PSNR, should be in the range [47.6, 58.7].
+
+    Returns
+    -------
+    float
+        Fingerprint strenght.
+    """
+
     def psnr(alpha):
         return stats.psnr(im, copy_attack(im, k, alpha)) - A
 
