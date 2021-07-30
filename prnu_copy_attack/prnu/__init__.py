@@ -7,4 +7,8 @@
 from .extract import extract_prnu_single
 from .extract import extract_prnu
 from .extract import extract_prnu_var
+
 from .noise import extract_noise
+
+from .copy_attack import copy_attack
+from .copy_attack import compute_alpha
