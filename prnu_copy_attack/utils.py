@@ -5,7 +5,11 @@
 # Permission is granted to use, copy, modify, and redistribute the work.
 # Full license information available in the project LICENSE file.
 
+from glob import glob
+
 import numpy as np
+from PIL import Image
+from tqdm import tqdm
 
 
 def cut_center(array, shape):
@@ -200,3 +204,39 @@ def gen_blocks_rnd(im_shape, min_block_shape=(16, 16), max_block_shape=(40, 40),
         i0 += height
 
     return blocks
+
+
+def load_imgs(pattern, cut=None):
+    """
+    Load a series of images from path.
+
+    Parameters
+    ----------
+    pattern : str
+        Path interpreted by glob from which images are loaded.
+    cut : int or tuple of int, optional
+        Shape to be passed to cut_center, if None no cut is done.
+        If int (cut, cut, 3) is passed
+
+    Returns
+    -------
+    numpy.ndarray
+        Loaded images.
+    """
+
+    if isinstance(cut, tuple):
+        if len(cut) == 2:
+            cut += (3,)
+    elif isinstance(cut, int):
+        cut = (cut, cut, 3)
+    else:
+        raise ValueError("cut must be a tuple or int")
+
+    imgs = []
+    for path in tqdm(glob(pattern)):
+        im = np.asarray(Image.open(path), dtype=np.uint8)
+        if cut is not None:
+            im = cut_center(im, cut)
+        imgs.append(im)
+
+    return imgs
