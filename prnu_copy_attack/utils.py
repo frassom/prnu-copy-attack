@@ -229,7 +229,7 @@ def load_imgs(pattern, cut=None):
             cut += (3,)
     elif isinstance(cut, int):
         cut = (cut, cut, 3)
-    else:
+    elif cut is not None:
         raise ValueError("cut must be a tuple or int")
 
     imgs = []
