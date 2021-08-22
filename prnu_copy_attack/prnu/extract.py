@@ -5,7 +5,7 @@
 # Permission is granted to use, copy, modify, and redistribute the work.
 # Full license information available in the project LICENSE file.
 
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 import numpy as np
 from tqdm import tqdm
 
@@ -16,8 +16,6 @@ from .noise import extract_noise_compact
 from .noise import wiener_dft
 from .noise import zero_mean_total
 from .noise import inten_sat_compact
-from .noise import inten_scale
-from .noise import saturation
 
 
 def extract_prnu_single(im, levels=4, sigma=5, wdft_sigma=0):
@@ -104,8 +102,9 @@ def extract_prnu(imgs, levels=4, sigma=5, processes=None):
     # Single process
     else:
         for im in imgs:
-            RPsum += extract_noise_compact((im, levels, sigma))
-            NN += (inten_scale(im) * saturation(im)) ** 2
+            args = (im, levels, sigma)
+            RPsum += extract_noise_compact(args)
+            NN += inten_sat_compact(args)
 
     K = RPsum / (NN + 1)
     K = utils.rgb2gray(K)
