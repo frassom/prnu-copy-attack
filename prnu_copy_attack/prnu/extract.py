@@ -163,6 +163,12 @@ def extract_prnu_var(
     if not imgs[0].dtype == np.uint8:
         raise ValueError("images type must be np.uint8")
 
+    if len(imgs) < r:
+        raise ValueError("r must be bigger than len(imgs)")
+
+    if R is not None and R < r:
+        raise ValueError("R must be bigger than r")
+
     rng = utils.get_rng(rnd)
 
     K = np.empty(imgs[0].shape[0:2], dtype=np.float32)
@@ -193,6 +199,10 @@ def extract_prnu_var(
             var = np.asarray(var, dtype=object).T[1]
             var = rng.choice(var, r, replace=False)
 
+        if len(var) != r:
+            raise RuntimeError(
+                "Couldn't find enough images with requested characteristic")
+
         imgs_used_idx.append(var)
 
     cache = dict()
@@ -217,7 +227,7 @@ def extract_prnu_var(
         for im_idx, w, nn in zip(unique_imgs, w_list, nn_list):
             cache[im_idx] = {"W": w, "NN": nn}
     else:
-        for im_idx in tqdm(np.unique(imgs_used_idx)):
+        for im_idx in tqdm(unique_imgs):
             args = (imgs[im_idx], levels, sigma)
             cache[im_idx] = {
                 "W": extract_noise_compact(args),
