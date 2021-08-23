@@ -1,6 +1,6 @@
 # Python variance-based fingerprint-copy attack
 
-Python implementation of the PRNU extraction methods described in [1], PRNU detection based on PCE, and the Triangle Test as described in [2].
+Python implementation of the PRNU extraction methods described in Barni et al. [1], PRNU detection based on PCE, and the Triangle Test as described in Goljan et al. [2].
 
 ## Test
 `python test` from the repository root.
