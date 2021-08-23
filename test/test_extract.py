@@ -10,7 +10,7 @@ import os
 import numpy as np
 from PIL import Image
 
-import prnu_copy_attack.prnu.extract as extract
+import prnu_copy_attack.extract as extract
 
 
 def load_im(name):

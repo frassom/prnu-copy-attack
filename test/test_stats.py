@@ -10,7 +10,7 @@ import os
 import numpy as np
 from PIL import Image
 
-from prnu_copy_attack.prnu import extract_prnu_single
+from prnu_copy_attack.extract import extract_prnu_single
 from prnu_copy_attack.utils import cut_center
 
 import prnu_copy_attack.stats as stats
