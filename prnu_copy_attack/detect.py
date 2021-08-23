@@ -4,6 +4,9 @@
 # Permission is granted to use, copy, modify, and redistribute the work.
 # Full license information available in the project LICENSE file.
 
+from multiprocessing import Pool
+from itertools import chain
+
 import numpy as np
 from scipy.stats import linregress, norm as normal
 import matplotlib.pyplot as plt
@@ -91,32 +94,21 @@ def crosscorr_est(im, w, im_test, w_test, k, block_shape=(128, 128), q=1):
     return crosscorr(w, k) * crosscorr(w_test, k) * mcf * q**-2
 
 
-def _compute_corr(im_test, w_test, imgs, k, block_shape):
-    """
-    Compute correlation and correlation estimate between images in imgs and im_test.
+def _compute_cc(args):
+    # Helper function for multiprocessing
+    im, im_test, w_test, k, block_shape = args
 
-    Returns
-    -------
-    cc_est : list of float
-        Estimated cross-correlation.
-    cc : list of float
-        Cross-correlation.
-    """
+    w = prnu.extract_noise(im)
+    w = utils.rgb2gray(w)
+    im = utils.rgb2gray(im)
 
-    cc_est = []
-    cc = []
-    for im in tqdm(imgs):
-        w = prnu.extract_noise(im)
-        w = utils.rgb2gray(w)
-        im = utils.rgb2gray(im)
+    cc_est = crosscorr_est(im, w, im_test, w_test, k, block_shape)
+    cc = crosscorr(w, w_test)
 
-        cc_est.append(crosscorr_est(im, w, im_test, w_test, k, block_shape))
-        cc.append(crosscorr(w, w_test))
-
-    return cc_est, cc
+    return cc, cc_est
 
 
-def triangle_test(im_test, imgs_pub, imgs_est, imgs_fit, k, block_shape=(128, 128)):
+def triangle_test(im_test, imgs_pub, imgs_priv, k, block_shape=(128, 128), processes=None):
     """
     Compute the Triangle Test as described in Fridrich et al. [2],
     return a class containing the results.
@@ -128,135 +120,184 @@ def triangle_test(im_test, imgs_pub, imgs_est, imgs_fit, k, block_shape=(128, 12
     imgs_pub : list of numpy.ndarray
         Images from the public dataset of the attacked camera, which may
         contains images used to estimate the PRNU noise by the attacker.
-    imgs_est : list of numpy.ndarray
+    imgs_priv : list of numpy.ndarray
         Images from the private dataset of the attacked camera,
-        used to estimate the reference line parameters.
-        Must contains images used to estimate k.
-    imgs_fit : list of numpy.ndarray
-        Images from the private dataset of the attacked camera,
-        used to simulate H0 (estimate pdf of the test statistic).
-        Must contains images used to estimate k.
+        used to estimate the reference line parameters and simulate H0.
+        Must not contains images used to estimate k.
     k : numpy.ndarray
         Camera fingerprint.
         This estimate should be computed with images not in imgs, imgs_fit or imgs_est.
     block_shape : tuple of int, optional
         Shape of the block to compute the estimate of the mutual-content factor.
         Recommended shape for the blocks is between (64, 64) and (256, 256).
+    proc : int, optional
+        Number of processes to be used while computing the correlations.
 
     Returns
     -------
-    TriangleTestResults
-        Class containing all the results obtained by the TriangleTest.
+    TriangleTestResult
+        Object containing the results.
     """
 
     w_test = prnu.extract_noise(im_test)
     w_test = utils.rgb2gray(w_test)
     im_test = utils.rgb2gray(im_test)
 
-    # Correlation of private images for reference line
-    cc_est_priv, cc_priv = \
-        _compute_corr(im_test, w_test, imgs_est, k, block_shape)
-    linreg = linregress(cc_est_priv, cc_priv)
+    arglist = [(im, im_test, w_test, k, block_shape)
+               for im in chain(imgs_pub, imgs_priv)]
 
-    # Correlation of private images for fit
-    cc_est, cc = _compute_corr(im_test, w_test, imgs_fit, k, block_shape)
-    cc_est_priv += cc_est
-    cc_priv += cc
+    if processes is None or processes > 1:
+        with Pool(processes=processes) as pool:
+            imap_res = pool.imap(_compute_cc, arglist)
 
-    # Compute normal fit
-    cc_est = np.asanyarray(cc_est)
-    cc = np.asanyarray(cc)
-    d = cc - linreg.slope * cc_est - linreg.intercept
-    fit = normal.fit(d)
+            # show progress
+            tot = len(imgs_pub) + len(imgs_priv)
+            corr = list(tqdm(imap_res, total=tot))
+    else:
+        corr = [_compute_cc(args) for args in tqdm(arglist)]
 
-    # Correlation of public images
-    corr_pub = _compute_corr(im_test, w_test, imgs_pub, k, block_shape)
+    corr_pub = np.asarray(corr[:len(imgs_pub)], dtype=float)
+    corr_priv = np.asarray(corr[len(imgs_pub):], dtype=float)
 
-    return TriangleTestResults(corr_pub, (cc_est_priv, cc_priv), linreg, fit)
+    return TriangleTestResult(corr_pub, corr_priv)
 
 
-class TriangleTestResults:
+class TriangleTestResult:
     """
     Class containing results from the Triangle Test.
 
     Parameters
     ----------
-    corr : list of float
-        True crosscorr between the tested image and images from the public dataset.
-    corr_est : list of float
-        Estimated crosscorr between the tested image and images from the public dataset.
-    linreg : LinregressResult
-        Result from scipy.stats.linregress .
-    fit : tuple of float
-        (loc, scale) result from scipy.stats.norm.fit .
-
-    Attributes
-    ----------
-    likelihood : float
-        The scaled log-likelihood computed with corr_pub.
+    corr_pub_all : numpy.ndarray
+        Correlations and estimated correlations from the public dataset.
+    corr_priv_all : numpy.ndarray
+        Correlations and estimated correlations from the private dataset.
     """
 
-    def __init__(self, corr_pub, corr_priv, linreg, fit):
-        self.corr_pub = np.asanyarray(corr_pub)
-        self.corr_priv = np.asanyarray(corr_priv)
-        self.slope = linreg.slope
-        self.intercept = linreg.intercept
-        self.loc = fit[0]
-        self.scale = fit[1]
+    def __init__(self, corr_pub_all, corr_priv_all):
+        self.corr_pub = corr_pub_all[:, 0]
+        self.corr_pub_est = corr_pub_all[:, 1]
+        self.corr_priv = corr_priv_all[:, 0]
+        self.corr_priv_est = corr_priv_all[:, 1]
 
-        # Compute scaled log-likelihood
-        size = self.corr_priv.shape[1]
-        d = self.corr_pub[1] - self.slope * self.corr_pub[0] - self.intercept
-        self.likelihood = \
-            np.sum(normal.logpdf(d, self.loc, self.scale)) / np.sqrt(size)
+        # Number of values used to estimate the reference line
+        # the remaining are used for the normal fit
+        line_chunk = self.corr_priv.size * .75
+        line_chunk = int(line_chunk)
+
+        corr_line = self.corr_priv[:line_chunk]
+        corr_fit = self.corr_priv[line_chunk:]
+        corr_est_line = self.corr_priv_est[:line_chunk]
+        corr_est_fit = self.corr_priv_est[line_chunk:]
+
+        # Compute reference line
+        lr = linregress(corr_est_line, corr_line)
+        self.slope = lr.slope
+        self.intercept = lr.intercept
+
+        # Compute normal fit for the statistic
+        d_priv = corr_fit - self.slope * corr_est_fit - self.intercept
+        self.loc, self.scale = normal.fit(d_priv)
+
+        # Test statistic
+        self.stat = self.corr_pub - self.slope * self.corr_pub_est - self.intercept
 
     def threshold(self, p_fa=1e-4):
         """
-        Computes the threshold for the statistic,
-        constraining the false alarm probability p_fa.
+        Computes the threshold constraining the false alarm probability p_fa.
         """
 
         return normal.isf(p_fa, self.loc, self.scale)
 
-    def is_forged(self, p_fa=1e-4):
-        """Check if the image was forged (Lk < Th)."""
+    def plot_stat(self, mode='h', idx_used=None, bins=100, ax=None):
+        """
+        Plot the test statistic with a scatter plot plotting also the threshold,
+        or in an instogram plotting the estimated pdf.
 
-        return self.likelihood < self.threshold(p_fa)
+        Parameters
+        ----------
+        mode : str, optional
+            Type of graph to show 's' for scatter, 'h' for histogram.
+        idx_used : list of int, optional
+            List containings the idices of the images used to compute the
+            fingerprint estimate by the attacker (not known in a real scenario).
+        bins : int, optional
+            Bins for histogram plot.
+        ax : Axes, optional
+        """
 
-    def plot(self, show_private=True, idx_used=None):
+        if ax is None:
+            plt.figure()
+            ax = plt.axes()
+
+        if mode == 'h':  # histogram plot
+            x = np.linspace(self.stat.min(), self.stat.max(), 100)
+            ax.plot(x, normal.pdf(x, self.loc, self.scale),
+                    color='gray', linewidth=.7)
+
+            if idx_used is None:
+                ax.hist(self.stat, bins=bins)
+            else:
+                idx_notused = np.delete(np.arange(self.stat.size), idx_used)
+                ax.hist([self.stat[idx_used], self.stat[idx_notused]],
+                        bins=bins,
+                        label=["Images used by Eve", "Images not used by Eve"],
+                        stacked=True)
+                ax.legend()
+
+            ax.set_xlabel("test stat")
+
+        elif mode == 's':  # scatter plot
+            x = np.arange(self.stat.size)
+            ax.plot(x, [self.threshold()]*x.size,
+                    color='gray', linewidth=.7)
+
+            if idx_used is None:
+                ax.scatter(x, self.stat, s=1)
+            else:
+                ax.scatter(x[idx_used], self.stat[idx_used],
+                           s=1, label="Images used by Eve")
+                idx_notused = np.delete(np.arange(self.stat.size), idx_used)
+                ax.scatter(x[idx_notused], self.stat[idx_notused],
+                           s=1, label="Images not used by Eve")
+                ax.legend()
+
+            ax.set_xlabel("Images")
+            ax.set_ylabel("test stat")
+
+    def plot_corr(self, idx_used=None, ax=None):
         """
         Plot true corr against estimated corr and the reference line.
 
         Parameters
         ----------
-        show_private : bool
-            Wether to plot the correlations from the private datased used
-            to build the reference line.
         idx_used : list of int
             List containings the idices of the images used to compute the
             fingerprint estimate by the attacker (not known in a real scenario).
+        ax : Axes, optional
         """
 
+        if ax is None:
+            plt.figure()
+            ax = plt.axes()
+
         if idx_used is None:
-            plt.scatter(self.corr_pub[0], self.corr_pub[1], s=1,
-                        marker=',', label="Public images")
+            ax.scatter(self.corr_pub_est, self.corr_pub,
+                       s=1, marker=',', label="Public images")
+            ax.scatter(self.corr_priv_est, self.corr_priv,
+                       s=1, marker=',', label="Private images")
         else:
-            plt.scatter(self.corr_pub[0][idx_used], self.corr_pub[1][idx_used],
-                        s=1, marker=',', label="Public images used by Eve")
-            idx_notused = np.delete(np.arange(self.corr_pub[0].size), idx_used)
-            plt.scatter(self.corr_pub[0][idx_notused], self.corr_pub[1][idx_notused],
-                        s=1, marker=',', label="Public images not used by Eve")
-            plt.legend()
+            ax.scatter(self.corr_pub_est[idx_used], self.corr_pub[idx_used],
+                       s=1, marker=',', label="Images used by Eve")
+            idx_notused = np.delete(
+                np.arange(self.corr_pub.size), idx_used)
+            ax.scatter(self.corr_pub_est[idx_notused], self.corr_pub[idx_notused],
+                       s=1, marker=',', label="Images not used by Eve")
 
-        if show_private:
-            plt.scatter(self.corr_priv[0], self.corr_priv[1],
-                        s=1, marker=',', label="Private images")
-            plt.legend()
-
-        x = np.array(plt.xlim())
+        x = np.array(ax.get_xlim())
         y = self.intercept + self.slope * x
-        plt.plot(x, y, color="#555", linestyle='-.')
+        ax.plot(x, y, color="gray", linewidth=.7)
 
-        plt.xlabel("estimated crosscorr")
-        plt.ylabel("crosscorr")
-        plt.show()
+        ax.set_xlabel("estimated crosscorr")
+        ax.set_ylabel("crosscorr")
+        ax.legend()
