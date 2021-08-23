@@ -5,9 +5,10 @@
 # Permission is granted to use, copy, modify, and redistribute the work.
 # Full license information available in the project LICENSE file.
 
+import sys
 from multiprocessing import Pool
+
 import numpy as np
-from tqdm import tqdm
 
 import utils
 
@@ -84,27 +85,17 @@ def extract_prnu(imgs, levels=4, sigma=5, processes=None):
 
     # Multi process
     if processes is None or processes > 1:
-        arglist = []
-        for im in imgs:
-            arglist.append((im, levels, sigma))
+        arglist = [(im, levels, sigma) for im in imgs]
 
         with Pool(processes=processes) as pool:
-            nni = pool.map(inten_sat_compact, arglist)
-            for ni in nni:
-                NN += ni
-            del nni
-
-            wi_list = pool.map(extract_noise_compact, arglist)
-            for wi in wi_list:
-                RPsum += wi
-            del wi_list
+            RPsum = sum(pool.map(extract_noise_compact, arglist))
+            NN = sum(pool.map(inten_sat_compact, arglist))
 
     # Single process
     else:
         for im in imgs:
-            args = (im, levels, sigma)
-            RPsum += extract_noise_compact(args)
-            NN += inten_sat_compact(args)
+            RPsum += extract_noise_compact((im, levels, sigma))
+            NN += inten_sat_compact((im, levels, sigma))
 
     K = RPsum / (NN + 1)
     K = utils.rgb2gray(K)
@@ -123,7 +114,8 @@ def extract_prnu_var(
         levels=4,
         sigma=5,
         processes=None,
-        rnd=None):
+        rnd=None,
+        full_output=False):
     """
     Extract prnu noise from a list of images of same size, using one of the variance-based methods
 
@@ -147,11 +139,15 @@ def extract_prnu_var(
         Number of parallel processes.
     rng : numpy.random.Generator or int or None, optional
         see utils.get_rng .
+    full_output : bool, optional
+        If set to true a list containing indices of the used images is returned with the PRNU noise.
 
     Returns
     -------
     K : numpy.ndarray
         PRNU noise.
+    indices : list of int, optional
+        List of indices of image used to compute the PRNU noise.
     """
 
     if not isinstance(imgs[0], np.ndarray):
@@ -173,11 +169,10 @@ def extract_prnu_var(
 
     K = np.empty(imgs[0].shape[0:2], dtype=np.float32)
 
-    print("Choose images by minimum variance")
-
+    # Order images by variance and choose the best ones
     grays = dict()
     imgs_used_idx = []
-    for b in tqdm(blocks):
+    for b in blocks:
         var = []
         for im_idx, im in enumerate(imgs):
             if im_idx not in grays:
@@ -207,36 +202,28 @@ def extract_prnu_var(
 
     cache = dict()
 
+    # Compute noise and inten-sat
+    unique_imgs = np.unique(imgs_used_idx)
     if processes is None or processes > 1:
-        unique_imgs = np.unique(imgs_used_idx)
 
-        arglist = []
-        for im_idx in unique_imgs:
-            arglist.append((imgs[im_idx], levels, sigma))
+        arglist = [(imgs[im_idx], levels, sigma) for im_idx in unique_imgs]
 
         with Pool(processes=processes) as pool:
-            print("Compute noise")
-            res = pool.imap(extract_noise_compact, arglist)
-            w_list = list(tqdm(res, total=len(arglist)))
+            w_list = pool.map(extract_noise_compact, arglist)
 
-            print("Compute intensity-saturation")
-            res = pool.imap(inten_sat_compact, arglist)
-            nn_list = list(tqdm(res, total=len(arglist)))
+            nn_list = pool.map(inten_sat_compact, arglist)
 
-        # Build cache dictionary
-        for im_idx, w, nn in zip(unique_imgs, w_list, nn_list):
-            cache[im_idx] = {"W": w, "NN": nn}
+            for im_idx, w, nn in zip(unique_imgs, w_list, nn_list):
+                cache[im_idx] = {"W": w, "NN": nn}
     else:
-        for im_idx in tqdm(unique_imgs):
-            args = (imgs[im_idx], levels, sigma)
+        for im_idx in unique_imgs:
             cache[im_idx] = {
-                "W": extract_noise_compact(args),
-                "NN": inten_sat_compact(args)
+                "W": extract_noise_compact((imgs[im_idx], levels, sigma)),
+                "NN": inten_sat_compact((imgs[im_idx], levels, sigma))
             }
 
     # Finally compute K for each block
-    print("Extracting prnu")
-    for imgs_idx, b in zip(tqdm(imgs_used_idx), blocks):
+    for imgs_idx, b in zip(imgs_used_idx, blocks):
         RPsum = np.zeros(imgs[0].shape, dtype=np.float32)
         NN = np.zeros(imgs[0].shape, dtype=np.float32)
         for im_idx in imgs_idx:
@@ -249,4 +236,7 @@ def extract_prnu_var(
         K_full = wiener_dft(K_full, K_full.std(ddof=1)).astype(np.float32)
         K[b] = K_full[b]
 
-    return K
+    if full_output:
+        return K, unique_imgs
+    else:
+        return K
