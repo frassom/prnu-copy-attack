@@ -10,9 +10,8 @@ from itertools import chain
 import numpy as np
 from scipy.stats import linregress, norm as normal
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 
-import prnu
+import extract
 import utils
 from stats import crosscorr
 
@@ -98,7 +97,7 @@ def _compute_cc(args):
     # Helper function for multiprocessing
     im, im_test, w_test, k, block_shape = args
 
-    w = prnu.extract_noise(im)
+    w = extract.extract_noise(im)
     w = utils.rgb2gray(w)
     im = utils.rgb2gray(im)
 
@@ -139,7 +138,7 @@ def triangle_test(im_test, imgs_pub, imgs_priv, k, block_shape=(128, 128), proce
         Object containing the results.
     """
 
-    w_test = prnu.extract_noise(im_test)
+    w_test = extract.extract_noise(im_test)
     w_test = utils.rgb2gray(w_test)
     im_test = utils.rgb2gray(im_test)
 
@@ -148,13 +147,10 @@ def triangle_test(im_test, imgs_pub, imgs_priv, k, block_shape=(128, 128), proce
 
     if processes is None or processes > 1:
         with Pool(processes=processes) as pool:
-            imap_res = pool.imap(_compute_cc, arglist)
+            corr = pool.map(_compute_cc, arglist)
 
-            # show progress
-            tot = len(imgs_pub) + len(imgs_priv)
-            corr = list(tqdm(imap_res, total=tot))
     else:
-        corr = [_compute_cc(args) for args in tqdm(arglist)]
+        corr = [_compute_cc(args) for args in arglist]
 
     corr_pub = np.asarray(corr[:len(imgs_pub)], dtype=float)
     corr_priv = np.asarray(corr[len(imgs_pub):], dtype=float)
