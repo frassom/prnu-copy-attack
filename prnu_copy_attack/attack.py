@@ -5,12 +5,12 @@
 # Full license information available in the project LICENSE file.
 
 import numpy as np
-import scipy as sp
+import scipy.optimize as opt
 
 import stats
 
 
-def copy_attack(im, k, alpha=None):
+def copy_attack(im, k, alpha=None, blocks=None, A=50):
     """
     Perform a fingerprint-copy attack on im with fingerprint k.
 
@@ -20,8 +20,10 @@ def copy_attack(im, k, alpha=None):
         Image to forge with the fingerprint, of shape (h, w, ch).
     k : numpy.ndarray
         Camera Fingerprint to apply on im, of shape (h, w).
-    alpha : float, optional
-        Fingerprint strength, if None the value is estimated through compute_alpha
+    alpha : float or list of float, optional
+        Fingerprint strength, if None the value is estimated through compute_alpha.
+    blocks : list of (slice, slice), optional
+        Used to compute alpha when alpha is None. If None alpha will be computed for the whole image
 
     Returns
     -------
@@ -33,14 +35,25 @@ def copy_attack(im, k, alpha=None):
         raise ValueError("im and k shapes don't match")
 
     if alpha is None:
-        alpha = compute_alpha(im, k)
+        alpha = compute_alpha(im, k, blocks, A)
+    elif isinstance(alpha, float):
+        alpha = [alpha]
+
+    if not isinstance(alpha, list):
+        raise ValueError("invalid value of alpha")
 
     im = im.astype(np.float32)
-    im_forge = im + alpha * im * k[:, :, None]
+    if blocks is None:
+        im_forge = im + alpha[0] * im * k[:, :, None]
+    else:
+        im_forge = np.empty(im.shape, np.float32)
+        for b, a in zip(blocks, alpha):
+            im_forge[b] = im[b] + a * im[b] * k[b][:, :, None]
+
     return im_forge.round().clip(0, 255).astype(np.uint8)
 
 
-def compute_alpha(im, k, A=50):
+def compute_alpha(im, k, blocks=None, A=50):
     """
     Return the value of fingerprint strength that if used on an image
     J to generate J' with copy_attack result in PSNR(J,J') == A.
@@ -56,26 +69,34 @@ def compute_alpha(im, k, A=50):
         Image to be forged with k.
     k : numpy.ndarray
         Camera fingerprint.
+    blocks : list of (slice, slice), optional
     A : float, optional
         Target value of PSNR, should be in the range [47.6, 58.7].
 
     Returns
     -------
     float
-        Fingerprint strenght.
+        Fingerprint strenght(s).
     """
 
-    def psnr(alpha):
-        return stats.psnr(im, copy_attack(im, k, alpha)) - A
+    if blocks is None:
+        blocks = [np.s_[0:im.shape[0], 0:im.shape[1]]]
 
-    a = 0
-    b = 0.2
-    while psnr(b) >= 0:
-        b += 0.2
+    alphas = []
 
-    x0, r = sp.optimize.bisect(psnr, a, b, maxiter=100, full_output=True)
+    for i, b in enumerate(blocks):
+        def psnr(alpha):
+            return stats.psnr(im[b], copy_attack(im[b], k[b], alpha)) - A
 
-    if not r.converged:
-        raise RuntimeError("Unable to find alpha, did not converge")
+        a1 = 0
+        a2 = 0.2
+        while psnr(a2) >= 0:
+            a2 += 0.2
 
-    return x0
+        a, r = opt.bisect(psnr, a1, a2, maxiter=100, full_output=True)
+        alphas.append(a)
+
+        if not r.converged:
+            raise RuntimeError("Unable to find alpha, did not converge")
+
+    return alphas
